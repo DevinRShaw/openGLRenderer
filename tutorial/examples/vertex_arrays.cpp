@@ -1,0 +1,323 @@
+//glew has to be included first, in docs 
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream> //what is this again 
+
+//review macros, this is add a breakpoint at compile time this is pretty cool 
+#define ASSERT(x) if ((!x)) __debugbreak(); //this is compiler specific since we are using a macro (msvc)
+
+//this will help us call some cleaner error checking 
+//this is inserting the function call between the two 
+#define GLCall(x) GLClearError();\
+    x;\
+    ASSERT((GLLogCall(#x,__FILE__,__LINE__))); //file and line are intrinsics, #converts part of maro to a string holy crap 
+
+//loop to clear all the errors that may be present, this is like checking in on openGL and there is an easier way to do this 
+static void GLClearError() {
+    while (glGetError() != GL_NO_ERROR); //loops and calls repeatedly
+}
+
+static bool GLLogCall(const char* function, const char* file, int line) {
+
+    while (GLenum error = glGetError()) { //consume errors and print 
+        std::cout << "Error Code: " << error << " @ Function: " << function << " @ file " << file << " @ line " << line << std::endl;
+
+        return false; //badly written, just return on first loop this is just to show you 
+    }
+    return true;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+struct ShaderProgramSource
+{
+    std::string VertexSource;
+    std::string FragmentSource;
+};
+
+//handling shaders in a seperate file to use for this 
+static ShaderProgramSource ParseShader(const std::string& filepath)
+{
+    std::ifstream stream(filepath);
+
+
+    //for indexing the shaders into stringstream 
+    enum class ShaderType
+    {
+        NONE = -1, VERTEX = 0, FRAGMENT = 1
+    };
+
+    ShaderType type = ShaderType::NONE;
+    std::stringstream ss[2]; //we use this to continously put values into string 
+
+    //is there a way we can write this to adapt to the number of shaders defined in the file, that way we don't have hard coded two in there 
+
+    //getline consumes lines by newline, line is holding each new line we consume from getline 
+    std::string line;
+    while (getline(stream, line))
+    {
+
+        //once we see a shader, we set the stringstream index to start adding to 
+        if (line.find("#shader") != std::string::npos) {
+            if (line.find("vertex") != std::string::npos)
+                type = ShaderType::VERTEX;
+            else if (line.find("fragment") != std::string::npos)
+                type = ShaderType::FRAGMENT;
+        }
+        else
+        {
+            ss[(int)type] << line << '\n';
+        }
+    }
+    return { ss[0].str(), ss[1].str() };
+
+}
+
+//helper to be called, static just means that only can be used in file where it is defined 
+static unsigned int CompileShader(unsigned int type, const std::string& source)
+{
+    //review this block later, to understand the internals 
+    unsigned int id = glCreateShader(type);
+    const char* src = source.c_str(); //convert to c string for use, same as &source[0] pointer to first part of bytes 
+    glShaderSource(id, 1, &src, nullptr);
+    glCompileShader(id);
+
+    //need error handling to understand what is happening
+    int result;
+    glGetShaderiv(id, GL_COMPILE_STATUS, &result);
+    if (result == GL_FALSE)
+    {
+
+        int length;
+        //read docs on this 
+        glGetShaderiv(id, GL_INFO_LOG_LENGTH, &length);
+        //char arrays have to have constant length, alloca is allocatontion on the stack, clever work around to random thing about char arrays 
+        //char message [length] not allowed, since length is variable 
+        char* message = (char*)alloca(length * sizeof(char));
+
+        glGetShaderInfoLog(id, length, &length, message);
+        std::cout << "failed to compile shader of type" << type << std::endl;
+        std::cout << message << std::endl;
+        glDeleteShader(id);
+        return 0;
+
+    }
+
+
+
+
+    return id;
+}
+
+//source code is within the strings that are passed into this
+static int CreateShader(const std::string& vertexShader, const std::string& fragmentShader)
+{
+    //provide openGL with our shader code to compile, then bind that shader back 
+    //the API is inconsistent, dont worry about it too much 
+    unsigned int program = glCreateProgram();
+    //vertex shader, point transforms
+    unsigned int vs = CompileShader(GL_VERTEX_SHADER, vertexShader);
+    //fragment shader, rasterize changes, coloring book 
+    unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, fragmentShader);
+
+    glAttachShader(program, vs);
+    glAttachShader(program, fs);
+    glLinkProgram(program);
+    glValidateProgram(program);
+
+    //delete the intermediate object files
+    //they are linked into a program now 
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+
+    //glDetachShader, usually not a good idea, deletes the source code, good to keep for debugging 
+
+
+    return program;
+}
+
+
+
+
+
+int test7(void)
+{
+    GLFWwindow* window;
+
+    /* Initialize the library */
+    if (!glfwInit())
+        return -1;
+
+    //VAOs are mandatory in core profile 
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //core profile will throw error if we dont have VAOs
+
+    /* Create a windowed mode window and its OpenGL context */
+    window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
+    if (!window)
+    {
+        glfwTerminate();
+        return -1;
+    }
+
+    /* Make the window's context current */
+    glfwMakeContextCurrent(window);
+
+    //docs say you have to have a valid window before you call glew init
+    if (glewInit() != GLEW_OK)
+        std::cout << "Error glew init" << std::endl;
+
+
+    std::cout << glGetString(GL_VERSION) << std::endl;
+
+
+
+
+
+    //also a buffer holding our data pertaing to the triangle 
+    //attributes are used to specify what the buffer structure is 
+    float positions[]{
+        -0.5f, -0.5f, //0 
+         0.5f, -0.5f, //1
+         0.5f,  0.5f, //2
+
+         //0.5f,  0.5f, duplicate
+
+        -0.5f,  0.5f, //3
+
+        //-0.5f, -0.5f, duplicate 
+    };
+
+    //index buffer 
+    //use index of the vertices to construct the faces 
+    unsigned int indices[]{
+        0, 1 ,2, //first half of square 
+        2, 3, 0
+    };
+
+
+    //how are these linking together?? is it by order? is it by id?
+    //when you bind the vertex array, then bind buffer, when we use the attribpointer that index 0 is binding the vertex buffer to vertex array 
+
+
+    //vertex array binding, do not have to actually call vertex attrib array things 
+
+    unsigned int vao;
+    GLCall(glGenVertexArrays(1, &vao));
+    GLCall(glBindVertexArray(vao));
+
+
+
+    //id of the buffer put into the pointer of this value 
+    unsigned int buffer;
+    //num buffers, pointer to unsigned int -> create a buffer, assign id to the unsigned int
+    glGenBuffers(1, &buffer);
+    //now we bind to a target to describe how that buffer behaves 
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    //data into that created and targeted buffer 
+    glBufferData(GL_ARRAY_BUFFER, 6 * 2 * sizeof(float), positions, GL_STATIC_DRAW);
+
+
+
+    //index of vertex attribute to enable, review this more later, how exactly vertex attribute stuff is working for rendering 
+    glEnableVertexAttribArray(0);
+    //index, number of components per vertex, type, normalize, stride, points to first component of first generic vertex = reviwe later wtf 
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
+
+
+
+    //this is for the index buffer but is a similar thing going on 
+    unsigned int ibo; //index buffer object 
+    glGenBuffers(1, &ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices, GL_STATIC_DRAW);
+
+
+
+
+    ShaderProgramSource source = ParseShader("res/shaders/basic.shader");
+
+    unsigned int shader = CreateShader(source.VertexSource, source.FragmentSource);
+    glUseProgram(shader);
+
+    int location = glGetUniformLocation(shader, "u_Color");
+    std::cout << location;
+    ASSERT((location != -1));
+    //uniform is used with the shader 
+    glUniform4f(location, 0.8f, 0.3f, 0.8f, 1.0f);
+
+    //lets imagine that we have to bind everytime because we have multiple different vertex layouts
+    //unbind what we already did 
+
+    GLCall(glUseProgram(0));    
+    GLCall(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
+
+    float r = 0.0f;
+    float increment = 0.05f;
+
+    /* Loop until the user closes the window */
+    while (!glfwWindowShouldClose(window))
+    {
+        /* Render here */
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        //if you had to call everytime due to multiple objects of different layout 
+        GLCall(glUseProgram(shader));
+        glUniform4f(location, r, 0.3f, 0.8f, 1.0f);
+
+        /* dont have to do this because of vao 
+        GLCall(glBindBuffer(GL_ARRAY_BUFFER, buffer));
+        GLCall(glEnableVertexAttribArray(0));
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
+        */
+
+        GLCall(glBindVertexArray(vao));
+        GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo));
+
+
+
+
+
+
+        //new error handling with some cool macro magic 
+        GLCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
+
+
+        if (r > 0.8)
+            increment = -0.05f;
+        else if (r < 0.0f)
+            increment = 0.05f;
+
+        r += increment;
+
+        /* Swap front and back buffers */
+        glfwSwapBuffers(window);
+
+
+        /* Poll for and process events */
+        glfwPollEvents();
+    }
+
+
+    //this cleans up the shaders, should for vertex buffers as well 
+    glDeleteProgram(shader);
+
+    glfwTerminate();
+    return 0;
+}
