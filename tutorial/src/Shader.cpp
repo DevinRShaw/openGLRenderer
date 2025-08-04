@@ -4,7 +4,7 @@
 #include <string>
 #include <sstream> 
 
-#include "Renderer.h"
+#include "macros.h"
 
 
 
@@ -13,8 +13,8 @@ Shader::Shader(const std::string& filepath)
 	: m_FilePath(filepath), m_RendererID(0)
 {
     ShaderProgramSource source = ParseShader(filepath);
-    unsigned int shader = CreateShader(source.VertexSource, source.FragmentSource);
-    m_RendererID = shader;
+    m_RendererID =  CreateShader(source.VertexSource, source.FragmentSource);
+   
 }   
 
 Shader::~Shader()
@@ -136,13 +136,18 @@ void Shader::Unbind() const
     GLCall(glUseProgram(0));
 }
 
-void Shader::SetUniform(const std::string& name, float v0, float v1, float v2, float v3)
+void Shader::SetUniform4f(const std::string& name, float v0, float v1, float v2, float v3)
 {
    
     GLCall(glUniform4f(GetUniformLocation(name), v0, v1, v2, v3));
 }
 
-unsigned int Shader::GetUniformLocation(const std::string& name)
+void Shader::SetUniformMat4f(const std::string& name, const glm::mat4& matrix) {
+    //gldocs for knowing wassup with this one 
+    GLCall(glUniformMatrix4fv(GetUniformLocation(name), 1, GL_FALSE, &matrix[0][0]));
+}
+
+unsigned int Shader::GetUniformLocation(const std::string& name) 
 {
     GLCall( unsigned int location = glGetUniformLocation(m_RendererID, name.c_str()));
     if (location == -1) std::cout << "Uniform " << name << " doesn't exist" << std::endl;

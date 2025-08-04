@@ -1,5 +1,7 @@
 #pragma once 
 #include <string>
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 struct ShaderProgramSource
 {
@@ -21,7 +23,8 @@ public:
 	void Unbind() const;
 
 	
-	void SetUniform(const std::string& name, float v0, float v1, float f2, float f3);
+	void SetUniform4f(const std::string& name, float v0, float v1, float f2, float f3);
+	void SetUniformMat4f(const std::string& name, const glm::mat4& matrix);
 
 private:
 	

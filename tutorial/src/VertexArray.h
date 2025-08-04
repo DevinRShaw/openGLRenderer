@@ -2,9 +2,9 @@
 #include "VertexBuffer.h"
 #include <iostream>
 #include <unordered_map>
-#include "Renderer.h"
+#include "macros.h"
 #include <vector>
-#include<string>
+#include <string>
 
 struct VertexBufferLayout {
     std::string name;       // Name for intuitive look up in the vertex array 
@@ -78,7 +78,11 @@ class VertexArray {
 
 		}
 
-        void Bind() {
+        void Bind() const {
             GLCall(glBindVertexArray(m_RendererID));
         }
+
+		void Unbind() const {
+			GLCall(glBindVertexArray(0));
+		}
 };

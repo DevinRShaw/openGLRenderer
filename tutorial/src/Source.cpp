@@ -12,6 +12,9 @@
 #include "IndexBuffer.h"
 #include "VertexArray.h"
 #include "Shader.h"
+#include "macros.h"
+const double PI = 3.14159265358979323846;
+
 
 
 
@@ -19,6 +22,7 @@
 
 int main(void)
 {
+  
     GLFWwindow* window;
 
     /* Initialize the library */
@@ -100,13 +104,22 @@ int main(void)
    
     IndexBuffer cubeIndex = IndexBuffer(indices, 36);
 
+    //This is example of using glm projection, this adjusts the ratio to create a square in non square window 
+	glm::mat4 projection = glm::ortho(-2.0f, 2.0f, -1.5f, 1.5f, -1.0f, 1.0f); 
+
+    glm::mat4 identityMatrix = glm::mat4(1.0f);
+	glm::mat4 rotation = glm::rotate(identityMatrix, 1.0f, glm::vec3(1, 0 ,0)); // translate the cube to the center of the screen
+    rotation = glm::rotate(rotation, 1.0f, glm::vec3(0, 1, 0)); // translate the cube to the center of the screen
+
+
+
     
 
     //glBindVertexArray(0); // Optional, unbind
 
     Shader shader("res/shaders/basic.shader");
     shader.Bind();
-    shader.SetUniform("u_Color", 0.8f, 0.3f, 0.8f, 1.0f);
+    shader.SetUniform4f("u_Color", 0.8f, 0.3f, 0.8f, 1.0f);
   
     cubeBuffer.Unbind();
     cubeIndex.Unbind();
@@ -117,31 +130,36 @@ int main(void)
 
     float r = 0.0f;
     float increment = 0.05f;
+    float spin1 = 0.0f;
+	float spin2 = 0.0f;
 
-    /* Loop until the user closes the window */
+    Renderer renderer;
+
     while (!glfwWindowShouldClose(window))
     {
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
 
+		//Can use a macro here to bind everytime we set uniform? Could be useful for quick development 
         shader.Bind();
+        shader.SetUniform4f("u_Color", r, 0.3f, 0.8f, 1.0f);
 
-        //lets make it a function of rendering time, this is the color, we want modulation
-        shader.SetUniform("u_Color", r, 0.3f, 0.8f, 1.0f);
+        
+		shader.SetUniformMat4f("u_MVP", projection);
+        shader.SetUniformMat4f("u_Rot", rotation);
 
-        vertexArray.Bind();
-        cubeIndex.Bind();
-
-        //dont need because we only have one object 
-        //GLCall(glBindVertexArray(vao));
-        //GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo));
-
-        //new error handling with some cool macro magic 
-        GLCall(glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr));
+		renderer.Draw(vertexArray, cubeIndex, shader);
 
 
-        if (r > 0.8) increment = -0.01f;
-        else if (r < 0.0f) increment = 0.01f;
+        if (r > 0.8) increment = -0.0001f;
+        else if (r < 0.0f) increment = 0.0001f;
+
+        spin1 += 0.0001f;
+        spin2 += 0.0002f;
+
+
+        rotation = glm::rotate(identityMatrix, spin1 , glm::vec3(1, 0, 0)); // translate the cube to the center of the screen
+        rotation = glm::rotate(rotation, spin2 , glm::vec3(0, 1, 0)); // translate the cube to the center of the screen
 
         r += increment;
 
